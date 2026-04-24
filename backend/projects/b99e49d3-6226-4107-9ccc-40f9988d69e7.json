@@ -1,0 +1,79 @@
+{
+  "project_id": "b99e49d3-6226-4107-9ccc-40f9988d69e7",
+  "created_at": "2026-04-24T17:41:17.270234",
+  "updated_at": "2026-04-24T17:41:17.270257",
+  "report_details": {
+    "client_name": "Client",
+    "market": "",
+    "report_title": "Customer Journey Flow",
+    "report_subtitle": "Cross-domain transitions",
+    "data_source_label": "",
+    "period": ""
+  },
+  "cohorts": {
+    "a": {
+      "name": "Converting",
+      "share_pct": null,
+      "total_users": null
+    },
+    "b": {
+      "name": "Non-Converting",
+      "share_pct": null,
+      "total_users": null
+    }
+  },
+  "key_stats": {
+    "a": {
+      "top_entry_page": "",
+      "top_entry_pct": "",
+      "top_transition": "",
+      "top_transition_pct": "",
+      "top_exit_page": "",
+      "top_exit_pct": ""
+    },
+    "b": {
+      "top_entry_page": "",
+      "top_entry_pct": "",
+      "top_transition": "",
+      "top_transition_pct": "",
+      "top_exit_page": "",
+      "top_exit_pct": ""
+    }
+  },
+  "node_config": {
+    "client_nodes": [],
+    "conversion_nodes": [],
+    "competitor_nodes": []
+  },
+  "column_labels": {
+    "col0": "Pre-Client",
+    "col1": "Discovery",
+    "col2": "Evaluation",
+    "col3": "Conversion",
+    "col4": "Post-Client"
+  },
+  "node_layer_overrides": [],
+  "insights": {
+    "a": [
+      "",
+      "",
+      "",
+      ""
+    ],
+    "b": [
+      "",
+      "",
+      "",
+      ""
+    ]
+  },
+  "uploaded_files": {
+    "entry_paths": null,
+    "exit_paths": null,
+    "internal_transitions": null,
+    "pre_entry": null,
+    "post_exit": null,
+    "mid_journey": null,
+    "full_transitions": null
+  }
+}
