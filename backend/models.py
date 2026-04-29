@@ -42,6 +42,7 @@ class NodeConfig(BaseModel):
     client_nodes: list[str] = Field(default_factory=list)
     conversion_nodes: list[str] = Field(default_factory=list)
     competitor_nodes: list[str] = Field(default_factory=list)
+    key_nodes: list[str] = Field(default_factory=list)
 
 
 class ColumnLabels(BaseModel):
