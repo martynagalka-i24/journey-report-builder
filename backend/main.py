@@ -173,6 +173,108 @@ def get_nodes(project_id: str):
     return {"nodes": sorted(node_set)}
 
 
+# ── Auto-suggest ─────────────────────────────────────────────────────────────
+
+@app.get("/api/projects/{project_id}/auto-suggest")
+def auto_suggest(project_id: str):
+    project = _load_project(project_id)
+    data_dir = _data_dir(project_id)
+
+    cohort_a = project.cohorts.a.name
+    cohort_b = project.cohorts.b.name
+
+    def cohort_key(name: str):
+        if name == cohort_a:
+            return "a"
+        if name == cohort_b:
+            return "b"
+        return None
+
+    # Detect client nodes from entry/exit/internal CSVs
+    client_nodes: set[str] = set()
+    for file_key, cols in [
+        ("entry_paths", ["page_type"]),
+        ("exit_paths", ["page_type"]),
+        ("internal_transitions", ["from_page", "to_page"]),
+    ]:
+        path = data_dir / f"{file_key}.csv"
+        if path.exists():
+            for r in parse_csv_to_records(path.read_bytes()):
+                for col in cols:
+                    val = r.get(col)
+                    if val:
+                        client_nodes.add(str(val))
+
+    def empty_stats():
+        return {"top_entry_page": "", "top_entry_pct": "", "top_transition": "", "top_transition_pct": "", "top_exit_page": "", "top_exit_pct": ""}
+
+    stats = {"a": empty_stats(), "b": empty_stats()}
+
+    entry_path = data_dir / "entry_paths.csv"
+    if entry_path.exists():
+        by_cohort: dict = {}
+        for r in parse_csv_to_records(entry_path.read_bytes()):
+            ck = cohort_key(str(r.get("cohort", "")))
+            if ck:
+                by_cohort.setdefault(ck, []).append(r)
+        for ck, rows in by_cohort.items():
+            top = max(rows, key=lambda x: float(x.get("unique_users", 0) or 0))
+            stats[ck]["top_entry_page"] = str(top.get("page_type", ""))
+            pct = top.get("pct_of_cohort", "")
+            stats[ck]["top_entry_pct"] = f"{pct}%" if pct else ""
+
+    exit_path = data_dir / "exit_paths.csv"
+    if exit_path.exists():
+        by_cohort = {}
+        for r in parse_csv_to_records(exit_path.read_bytes()):
+            ck = cohort_key(str(r.get("cohort", "")))
+            if ck:
+                by_cohort.setdefault(ck, []).append(r)
+        for ck, rows in by_cohort.items():
+            top = max(rows, key=lambda x: float(x.get("unique_users", 0) or 0))
+            stats[ck]["top_exit_page"] = str(top.get("page_type", ""))
+            pct = top.get("pct_of_cohort", "")
+            stats[ck]["top_exit_pct"] = f"{pct}%" if pct else ""
+
+    internal_path = data_dir / "internal_transitions.csv"
+    if internal_path.exists():
+        by_cohort = {}
+        for r in parse_csv_to_records(internal_path.read_bytes()):
+            ck = cohort_key(str(r.get("cohort", "")))
+            if ck:
+                by_cohort.setdefault(ck, []).append(r)
+        for ck, rows in by_cohort.items():
+            top = max(rows, key=lambda x: float(x.get("unique_users", 0) or 0))
+            from_p = str(top.get("from_page", ""))
+            to_p = str(top.get("to_page", ""))
+            stats[ck]["top_transition"] = f"{from_p} → {to_p}" if from_p and to_p else ""
+            pct = top.get("pct_of_cohort", "")
+            stats[ck]["top_transition_pct"] = f"{pct}%" if pct else ""
+
+    # Fallback: derive top_transition from full_transitions for any cohort still missing it
+    ft_path = data_dir / "full_transitions.csv"
+    if ft_path.exists() and any(not stats[ck]["top_transition"] for ck in ("a", "b")):
+        by_cohort = {}
+        for r in parse_csv_to_records(ft_path.read_bytes()):
+            ck = cohort_key(str(r.get("cohort", "")))
+            if not ck or stats[ck]["top_transition"]:
+                continue
+            from_n = str(r.get("from_node", ""))
+            to_n = str(r.get("to_node", ""))
+            # Only client→client transitions (both nodes known as client pages)
+            if from_n in client_nodes and to_n in client_nodes:
+                by_cohort.setdefault(ck, []).append(r)
+        for ck, rows in by_cohort.items():
+            top = max(rows, key=lambda x: float(x.get("unique_users", 0) or 0))
+            from_n = str(top.get("from_node", ""))
+            to_n = str(top.get("to_node", ""))
+            stats[ck]["top_transition"] = f"{from_n} → {to_n}" if from_n and to_n else ""
+            pct = top.get("pct_of_cohort", "")
+            stats[ck]["top_transition_pct"] = f"{pct}%" if pct else ""
+
+    return {"client_nodes": sorted(client_nodes), "key_stats": stats}
+
+
 # ── Report generation ─────────────────────────────────────────────────────────
 
 def _load_csv_data(project_id: str) -> dict:
