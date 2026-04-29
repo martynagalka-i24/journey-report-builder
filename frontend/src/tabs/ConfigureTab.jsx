@@ -163,18 +163,27 @@ function NodeTagger({ nodeConfig, projectId, onChange }) {
 
   function toggleTag(nodeId, tag) {
     const cfg = { ...nodeConfig }
-    const key = tag === 'client' ? 'client_nodes' : tag === 'conversion' ? 'conversion_nodes' : 'competitor_nodes'
+    const key = tag === 'client' ? 'client_nodes'
+      : tag === 'conversion' ? 'conversion_nodes'
+      : tag === 'key' ? 'key_nodes'
+      : 'competitor_nodes'
     const list = cfg[key] || []
     if (list.includes(nodeId)) {
       cfg[key] = list.filter(n => n !== nodeId)
     } else {
       cfg[key] = [...list, nodeId]
-      // Competitor nodes can't be client nodes
       if (tag === 'competitor') {
         cfg.client_nodes = (cfg.client_nodes || []).filter(n => n !== nodeId)
+        cfg.key_nodes = (cfg.key_nodes || []).filter(n => n !== nodeId)
       }
       if (tag === 'client') {
         cfg.competitor_nodes = (cfg.competitor_nodes || []).filter(n => n !== nodeId)
+      }
+      if (tag === 'key') {
+        // Key page is implicitly also a client node
+        if (!(cfg.client_nodes || []).includes(nodeId)) {
+          cfg.client_nodes = [...(cfg.client_nodes || []), nodeId]
+        }
       }
     }
     onChange(cfg)
@@ -214,9 +223,10 @@ function NodeTagger({ nodeConfig, projectId, onChange }) {
       </div>
 
       {/* Legend */}
-      <div style={{ display: 'flex', gap: 16, marginBottom: 14, fontSize: 11 }}>
+      <div style={{ display: 'flex', gap: 16, marginBottom: 14, fontSize: 11, flexWrap: 'wrap' }}>
         <span>✅ Client node</span>
-        <span>⭐ Conversion</span>
+        <span>⭐ Conversion (→ layer 3)</span>
+        <span>🔑 Key Page (triggers FOBO / Return ribbons)</span>
         <span>⚠ Competitor</span>
       </div>
 
@@ -224,6 +234,7 @@ function NodeTagger({ nodeConfig, projectId, onChange }) {
         {filtered.map(nodeId => {
           const isClient = nodeConfig.client_nodes?.includes(nodeId)
           const isConversion = nodeConfig.conversion_nodes?.includes(nodeId)
+          const isKey = nodeConfig.key_nodes?.includes(nodeId)
           const isCompetitor = nodeConfig.competitor_nodes?.includes(nodeId)
           const previewStyle = getNodePreviewStyle(nodeId)
 
@@ -236,6 +247,7 @@ function NodeTagger({ nodeConfig, projectId, onChange }) {
               background: 'var(--color-surface)',
               border: '1px solid var(--color-border)',
               borderRadius: 8,
+              flexWrap: 'wrap',
             }}>
               {/* Node preview chip */}
               <div style={{
@@ -250,6 +262,7 @@ function NodeTagger({ nodeConfig, projectId, onChange }) {
                 gap: 4,
               }}>
                 {isConversion && <span>⭐</span>}
+                {isKey && !isConversion && <span>🔑</span>}
                 {isCompetitor && <span>⚠</span>}
                 <span style={{ overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{nodeId}</span>
               </div>
@@ -262,6 +275,10 @@ function NodeTagger({ nodeConfig, projectId, onChange }) {
               <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', color: 'var(--color-text-muted)', userSelect: 'none', opacity: isClient ? 1 : 0.4 }}>
                 <input type="checkbox" checked={isConversion} onChange={() => isClient && toggleTag(nodeId, 'conversion')} disabled={!isClient} />
                 ⭐ Conversion
+              </label>
+              <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', color: 'var(--color-text-muted)', userSelect: 'none', opacity: isClient ? 1 : 0.4 }}>
+                <input type="checkbox" checked={isKey} onChange={() => toggleTag(nodeId, 'key')} disabled={isCompetitor} />
+                🔑 Key Page
               </label>
               <label style={{ display: 'flex', alignItems: 'center', gap: 5, fontSize: 12, cursor: 'pointer', color: 'var(--color-text-muted)', userSelect: 'none' }}>
                 <input type="checkbox" checked={isCompetitor} onChange={() => toggleTag(nodeId, 'competitor')} />
@@ -372,12 +389,61 @@ function SankeyLayoutSection({ columnLabels, nodeLayerOverrides, projectId, onCh
 
 // ── Main ConfigureTab ──────────────────────────────────────────────────────
 export default function ConfigureTab({ project, updateProject, projectId }) {
+  const [autoPopulating, setAutoPopulating] = useState(false)
+  const [autoPopulateMsg, setAutoPopulateMsg] = useState(null)
+
   function saveSection(key, value) {
     updateProject({ [key]: value })
   }
 
+  async function handleAutoPopulate() {
+    setAutoPopulating(true)
+    setAutoPopulateMsg(null)
+    try {
+      const res = await fetch(`/api/projects/${projectId}/auto-suggest`)
+      if (!res.ok) throw new Error('Failed to fetch suggestions')
+      const data = await res.json()
+      updateProject({
+        node_config: {
+          ...project.node_config,
+          client_nodes: data.client_nodes,
+        },
+        key_stats: {
+          a: { ...project.key_stats.a, ...data.key_stats.a },
+          b: { ...project.key_stats.b, ...data.key_stats.b },
+        },
+      })
+      setAutoPopulateMsg(`Auto-detected ${data.client_nodes.length} client nodes and filled key stats from your uploaded files.`)
+    } catch (e) {
+      setAutoPopulateMsg('Failed to auto-populate. Make sure entry paths, exit paths, and internal transitions files are uploaded.')
+    }
+    setAutoPopulating(false)
+  }
+
   return (
     <div>
+      {/* Auto-populate banner */}
+      <div className="card" style={{ marginBottom: 16, display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 16 }}>
+        <div>
+          <div style={{ fontSize: 13, fontWeight: 600, color: 'var(--color-text)', marginBottom: 3 }}>Auto-populate from uploaded files</div>
+          <div style={{ fontSize: 12, color: 'var(--color-text-muted)' }}>
+            Detects client nodes from entry/exit/internal transition files and fills key stats automatically.
+            You can still edit anything manually afterwards.
+          </div>
+          {autoPopulateMsg && (
+            <div style={{ fontSize: 12, color: 'var(--color-cohort-a-mid)', marginTop: 6 }}>{autoPopulateMsg}</div>
+          )}
+        </div>
+        <button
+          className="btn btn-primary"
+          onClick={handleAutoPopulate}
+          disabled={autoPopulating}
+          style={{ whiteSpace: 'nowrap', flexShrink: 0 }}
+        >
+          {autoPopulating ? 'Detecting…' : '✦ Auto-populate'}
+        </button>
+      </div>
+
       <ReportDetailsSection
         details={project.report_details}
         onChange={v => saveSection('report_details', v)}

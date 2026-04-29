@@ -4,47 +4,86 @@ import json
 from models import ProjectConfig
 
 
-def _compute_auto_layers(records: list[dict]) -> dict[str, int]:
-    """Longest-path algorithm to assign nodes to layers 0-4."""
-    if not records:
-        return {}
+def _assign_layers_from_files(csv_data: dict) -> dict[str, int]:
+    """
+    Assign Sankey layers based on which uploaded file each node appears in.
 
-    nodes = set()
-    edges: list[tuple[str, str]] = []
-    for r in records:
-        src = str(r.get("from_node", ""))
-        tgt = str(r.get("to_node", ""))
-        if src and tgt:
-            nodes.add(src)
-            nodes.add(tgt)
-            edges.append((src, tgt))
+    Layer 0 — pre_entry domain_categories      (external, before first client touch)
+    Layer 1 — entry_paths page_types           (client discovery pages)
+    Layer 2 — internal_transitions page_types  (client evaluation pages, not entry/exit)
+    Layer 3 — exit_paths page_types            (client conversion/exit pages)
+    Layer 4 — post_exit domain_categories      (external, after last client touch)
 
-    # Longest path via topological order
-    depth: dict[str, int] = {n: 0 for n in nodes}
-    changed = True
-    for _ in range(len(nodes) + 1):
-        if not changed:
-            break
-        changed = False
-        for src, tgt in edges:
-            if depth[src] + 1 > depth[tgt]:
-                depth[tgt] = depth[src] + 1
-                changed = True
+    Mid-journey external → layer 0 (external bounce during journey).
+    Nodes in multiple files → most specific assignment wins (entry > exit > internal > external).
+    """
+    entry_nodes: set[str] = set()
+    exit_nodes: set[str] = set()
+    internal_nodes: set[str] = set()
+    pre_entry_nodes: set[str] = set()
+    post_exit_nodes: set[str] = set()
+    mid_journey_nodes: set[str] = set()
 
-    if not depth:
-        return {}
+    for r in csv_data.get("entry_paths", []):
+        if r.get("page_type"):
+            entry_nodes.add(str(r["page_type"]))
 
-    max_depth = max(depth.values()) or 1
-    # Normalise to 0-4
-    return {n: round(d / max_depth * 4) for n, d in depth.items()}
+    for r in csv_data.get("exit_paths", []):
+        if r.get("page_type"):
+            exit_nodes.add(str(r["page_type"]))
+
+    for r in csv_data.get("internal_transitions", []):
+        for col in ("from_page", "to_page"):
+            if r.get(col):
+                internal_nodes.add(str(r[col]))
+
+    for r in csv_data.get("pre_entry", []):
+        if r.get("domain_category"):
+            pre_entry_nodes.add(str(r["domain_category"]))
+
+    for r in csv_data.get("post_exit", []):
+        if r.get("domain_category"):
+            post_exit_nodes.add(str(r["domain_category"]))
+
+    for r in csv_data.get("mid_journey", []):
+        if r.get("domain_category"):
+            mid_journey_nodes.add(str(r["domain_category"]))
+
+    # Collect all nodes from full_transitions
+    all_nodes: set[str] = set()
+    for r in csv_data.get("full_transitions", []):
+        if r.get("from_node"):
+            all_nodes.add(str(r["from_node"]))
+        if r.get("to_node"):
+            all_nodes.add(str(r["to_node"]))
+
+    layer_map: dict[str, int] = {}
+    for node in all_nodes:
+        if node in entry_nodes and node not in exit_nodes:
+            layer_map[node] = 1
+        elif node in exit_nodes and node not in entry_nodes:
+            layer_map[node] = 3
+        elif node in entry_nodes and node in exit_nodes:
+            # appears as both entry and exit — mid evaluation layer
+            layer_map[node] = 2
+        elif node in internal_nodes:
+            layer_map[node] = 2
+        elif node in post_exit_nodes:
+            layer_map[node] = 4
+        elif node in pre_entry_nodes or node in mid_journey_nodes:
+            layer_map[node] = 0
+        else:
+            layer_map[node] = 0  # unknown external → layer 0
+
+    return layer_map
 
 
-def _get_ribbon_type(from_node: str, to_node: str, client_nodes: list[str]) -> str:
+def _get_ribbon_type(from_node: str, to_node: str, client_nodes: list[str], fobo_nodes: set) -> str:
     src_is_client = from_node in client_nodes
     tgt_is_client = to_node in client_nodes
-    if src_is_client and not tgt_is_client:
+    if from_node in fobo_nodes and not tgt_is_client:
         return "fobo"
-    if not src_is_client and tgt_is_client:
+    if not src_is_client and to_node in fobo_nodes:
         return "return"
     return "default"
 
@@ -59,10 +98,21 @@ def generate_report(project: ProjectConfig, csv_data: dict) -> str:
 
     full_transitions = csv_data.get("full_transitions", [])
 
-    # Build layer map
-    auto_layers = _compute_auto_layers(full_transitions)
+    # Build layer map from uploaded files, then apply manual overrides
+    auto_layers = _assign_layers_from_files(csv_data)
     override_map = {o.node_id: o.layer for o in project.node_layer_overrides}
     layer_map = {**auto_layers, **override_map}
+
+    # Client-tagged nodes must never sit in external layers (0 or 4)
+    client_nodes_set = set(node_cfg.client_nodes)
+    for node, layer in list(layer_map.items()):
+        if node in client_nodes_set and layer in (0, 4):
+            layer_map[node] = 2
+
+    # Conversion-tagged nodes always go to layer 3 (the conversion column)
+    for node in node_cfg.conversion_nodes:
+        if node in layer_map:
+            layer_map[node] = 3
 
     # Collect unique nodes from transitions
     all_nodes_set = set()
@@ -89,6 +139,9 @@ def generate_report(project: ProjectConfig, csv_data: dict) -> str:
             "isCompetitor": nid in node_cfg.competitor_nodes,
         })
 
+    # FOBO/Return triggers only for conversion-tagged and key-tagged nodes
+    fobo_nodes = set(node_cfg.conversion_nodes) | set(node_cfg.key_nodes)
+
     # Build links list for JS (one entry per cohort)
     links_js = []
     for r in full_transitions:
@@ -102,7 +155,7 @@ def generate_report(project: ProjectConfig, csv_data: dict) -> str:
             "cohort": str(r.get("cohort", "")),
             "value": float(r.get("unique_users", 0)),
             "pct": float(r.get("pct_of_cohort", 0)),
-            "ribbonType": _get_ribbon_type(from_node, to_node, node_cfg.client_nodes),
+            "ribbonType": _get_ribbon_type(from_node, to_node, node_cfg.client_nodes, fobo_nodes),
         })
 
     report_data = {
@@ -352,7 +405,7 @@ input[type=range]::-webkit-slider-thumb {{
   border-radius: 8px;
   padding: 10px 14px;
   box-shadow: 0 4px 16px rgba(80,80,160,0.13);
-  max-width: 240px;
+  max-width: 320px;
   line-height: 1.7;
   font-size: 12px;
   pointer-events: none;
@@ -453,8 +506,8 @@ input[type=range]::-webkit-slider-thumb {{
     </div>
     <div class="slider-group">
       <span class="slider-label-text">Min. Reach</span>
-      <input type="range" id="thresholdSlider" min="0" max="35" step="0.5" value="5" oninput="onSlider(this.value)">
-      <span class="slider-value" id="sliderVal">5%</span>
+      <input type="range" id="thresholdSlider" min="0" max="5" step="0.1" value="0.3" oninput="onSlider(this.value)">
+      <span class="slider-value" id="sliderVal">0.3%</span>
     </div>
     <button class="clear-btn" id="clearBtn" onclick="clearHighlight()">✕ Clear highlight</button>
   </div>
@@ -500,7 +553,7 @@ input[type=range]::-webkit-slider-thumb {{
 const DATA = {data_json};
 
 let currentCohort = 'a';
-let threshold = 5;
+let threshold = 0.3;
 let highlightedNode = null;
 
 function setCohort(c) {{
@@ -611,7 +664,14 @@ function computeLayout(nodes, links, W, H) {{
     byLayer[n.layer].push(n);
   }});
 
-  const MAX_V = Math.max(...nodes.map(n => n.value));
+  // Proportional column heights: the column with the most total flow fills USABLE_H;
+  // sparse columns scale down so their nodes don't stretch unnecessarily.
+  const layerTotals = {{}};
+  for (let lay = 0; lay < NUM_LAYERS; lay++) {{
+    const ln = byLayer[lay] || [];
+    layerTotals[lay] = ln.reduce((s, n) => s + n.value, 0);
+  }}
+  const maxLayerTotal = Math.max(...Object.values(layerTotals).filter(v => v > 0), 1);
 
   // Assign y per layer
   for (let layer = 0; layer < NUM_LAYERS; layer++) {{
@@ -620,16 +680,18 @@ function computeLayout(nodes, links, W, H) {{
     layerNodes.sort((a, b) => b.value - a.value);
 
     const totalPad = NODE_PAD * (layerNodes.length - 1);
-    const available = USABLE_H - totalPad;
-    const totalVal = layerNodes.reduce((s, n) => s + n.value, 0);
+    const layerFraction = layerTotals[layer] / maxLayerTotal;
+    const allocated = Math.max(layerNodes.length * 30 + totalPad, layerFraction * USABLE_H);
+    const available = allocated - totalPad;
+    const totalVal = layerTotals[layer];
 
     layerNodes.forEach(n => {{
       n.height = Math.max(24, (n.value / totalVal) * available);
     }});
 
     const totalH = layerNodes.reduce((s, n) => s + n.height, 0);
-    if (totalH > available) {{
-      const scale = available / totalH;
+    if (totalH > USABLE_H - totalPad) {{
+      const scale = (USABLE_H - totalPad) / totalH;
       layerNodes.forEach(n => {{ n.height = Math.max(24, n.height * scale); }});
     }}
 
@@ -749,7 +811,13 @@ function renderSankey() {{
     return;
   }}
 
-  const H = Math.max(500, activeNodes.length * 40);
+  const tmpByLayer = {{}};
+  activeNodes.forEach(n => {{
+    if (!tmpByLayer[n.layer]) tmpByLayer[n.layer] = [];
+    tmpByLayer[n.layer].push(n);
+  }});
+  const maxNodesInLayer = Math.max(...Object.values(tmpByLayer).map(a => a.length), 1);
+  const H = Math.max(500, maxNodesInLayer * 55 + 80);
   svg.setAttribute('height', H);
   svg.setAttribute('viewBox', `0 0 ${{W}} ${{H}}`);
 
@@ -867,15 +935,35 @@ function showLinkTip(e, el) {{
 }}
 
 function showNodeTip(e, nodeId) {{
-  const node = DATA.nodes.find(n => n.id === nodeId);
-  const links = DATA.links.filter(l => l.cohort === DATA.cohorts[currentCohort].name);
-  const incoming = links.filter(l => l.target === nodeId).length;
-  const outgoing = links.filter(l => l.source === nodeId).length;
-  tip.innerHTML = `
-    <div class="tip-title">${{nodeId}}</div>
-    <div class="tip-sub">Incoming flows: ${{incoming}} · Outgoing: ${{outgoing}}</div>
-    <div class="tip-sub" style="margin-top:4px;font-style:italic;">Click to highlight</div>
-  `;
+  const links = DATA.links.filter(l => l.cohort === DATA.cohorts[currentCohort].name && l.pct >= threshold);
+  const incoming = links.filter(l => l.target === nodeId).sort((a, b) => b.pct - a.pct);
+  const outgoing = links.filter(l => l.source === nodeId).sort((a, b) => b.pct - a.pct);
+  const MAX = 5;
+  function fmtFlows(flows, isIn) {{
+    let html = '';
+    flows.slice(0, MAX).forEach(l => {{
+      const label = isIn ? l.source : l.target;
+      html += '<div style="display:flex;justify-content:space-between;gap:10px;padding:1px 0;font-size:11px;">'
+        + '<span style="color:var(--color-text);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">'
+        + (isIn ? '← ' : '→ ') + label + '</span>'
+        + '<span style="flex-shrink:0;color:var(--color-text-muted);">' + l.pct + '%</span></div>';
+    }});
+    if (flows.length > MAX) {{
+      html += '<div style="font-size:10px;color:var(--color-text-muted);margin-top:2px;">+' + (flows.length - MAX) + ' more</div>';
+    }}
+    return html;
+  }}
+  let html = '<div class="tip-title">' + nodeId + '</div>';
+  if (incoming.length) {{
+    html += '<div style="margin-top:6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--color-text-muted);">Incoming (' + incoming.length + ')</div>'
+      + fmtFlows(incoming, true);
+  }}
+  if (outgoing.length) {{
+    html += '<div style="margin-top:6px;font-size:10px;font-weight:600;text-transform:uppercase;letter-spacing:0.08em;color:var(--color-text-muted);">Outgoing (' + outgoing.length + ')</div>'
+      + fmtFlows(outgoing, false);
+  }}
+  html += '<div class="tip-sub" style="margin-top:6px;font-style:italic;">Click to highlight</div>';
+  tip.innerHTML = html;
   positionTip(e);
   tip.style.display = 'block';
 }}

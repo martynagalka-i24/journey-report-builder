@@ -79,7 +79,7 @@ You need **two terminal windows** running at the same time.
 
 ```bash
 cd backend
-uvicorn main:app --reload --port 8000
+python3 -m uvicorn main:app --reload --port 8000
 ```
 
 You should see output like:
@@ -216,6 +216,57 @@ journey-report-builder/
 ├── SPEC.md                  # Original product specification
 └── README.md
 ```
+
+---
+
+## Glossary
+
+### Journey terms
+
+| Term | Definition |
+|------|-----------|
+| **Conversion** | A user action signalling commercial intent — e.g. reaching a checkout page, completing a booking, or signing up. Defined per project via `{{CONVERSION_CONDITIONS}}` in the SQL. |
+| **Converting / Non-Converting** | The two cohorts the app always splits data into. A user is Converting if they ever triggered the conversion condition during the observation window. |
+| **Entry (first touch)** | The first page a user visits on the client website in the observation window. Captured by Q1b. |
+| **Exit (last touch)** | The last client page a user visits before the observation window ends or they leave permanently. Captured by Q2b. |
+| **Internal transition** | Navigation between two pages within the client domain — not crossing to an external site. Captured by Q3. |
+| **Pre-client** | External domains visited before the user's first visit to the client site. Captured by Q4. |
+| **Post-client** | External domains visited after the user's last visit to the client site. Captured by Q5. |
+| **Mid-journey external** | External domains visited between the user's first and last client touch. Captured by Q6. |
+| **Reach / pct\_of\_cohort** | The percentage of users in a cohort who made a given transition. Controls the Min. Reach slider in the exported report. |
+
+### Sankey layers
+
+| Layer | Name | What it contains |
+|-------|------|-----------------|
+| 0 | Pre-Client | External domains visited before the first client touch |
+| 1 | Discovery | Client pages that are primarily entry points |
+| 2 | Evaluation | Client pages visited mid-journey (appear in both entry and exit data) |
+| 3 | Conversion | Client pages tagged ⭐ Conversion in the configurator |
+| 4 | Post-Client | External domains visited after the last client touch |
+
+### Ribbon colours
+
+| Colour | Name | Meaning |
+|--------|------|---------|
+| Red | FOBO — Fear Of Better Options | A user leaves a Key Page or Conversion page to visit an external site |
+| Green | Return | A user comes back to a Key Page or Conversion page after visiting an external site |
+| Purple | Other flow | Any transition not involving a Key Page or Conversion page |
+
+### Node types
+
+| Tag | Marker | Effect |
+|-----|--------|--------|
+| Client node | Blue border | Marks a page as belonging to the client site. Drives layer assignment. |
+| Key Page | 🔑 | An important client page that triggers FOBO / Return ribbon colouring. |
+| Conversion | ⭐ | A client page representing a conversion action. Always placed in Layer 3. |
+| Competitor | ⚠ | An external domain that is a direct competitor. Highlighted in red. |
+
+### Categorisation notes
+
+- **`[ME] Other`** — Always end your `{{PAGE_TYPE_CASE}}` block with `ELSE '[ME] Other'` to keep the client catch-all label consistent across Q1b, Q2b, Q3 and Q7.
+- **Search** — Covers major global engines (Google, Bing, DuckDuckGo, etc.). Add regional variants relevant to your market if needed (e.g. Yandex, Naver, Baidu).
+- **Other (external)** — Catch-all for uncategorised external domains. Always run Q4a and Q5a first, review the raw domain list, and promote significant domains into named categories before running Q4b and Q5b.
 
 ---
 

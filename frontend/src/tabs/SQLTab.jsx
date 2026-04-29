@@ -36,7 +36,7 @@ const QUERIES = [
 WITH
 all_events AS (
   SELECT
-    user_pseudo_id,
+    uid,
     event_timestamp,
     target_domain,
     target_path,
@@ -46,27 +46,27 @@ all_events AS (
 ),
 user_cohorts AS (
   SELECT
-    user_pseudo_id,
+    uid,
     CASE WHEN MAX(is_conversion) = 1 THEN 'Converting' ELSE 'Non-Converting' END AS cohort
   FROM all_events
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 first_client_touch AS (
   SELECT
-    e.user_pseudo_id,
+    e.uid,
     e.target_path,
-    ROW_NUMBER() OVER (PARTITION BY e.user_pseudo_id ORDER BY e.event_timestamp) AS rn
+    ROW_NUMBER() OVER (PARTITION BY e.uid ORDER BY e.event_timestamp) AS rn
   FROM all_events e
   WHERE e.target_domain IN ({{CLIENT_DOMAINS}})
 )
 SELECT
   f.target_path,
   uc.cohort,
-  COUNT(DISTINCT f.user_pseudo_id) AS unique_users,
-  ROUND(100.0 * COUNT(DISTINCT f.user_pseudo_id) /
-    SUM(COUNT(DISTINCT f.user_pseudo_id)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
+  COUNT(DISTINCT f.uid) AS unique_users,
+  ROUND(100.0 * COUNT(DISTINCT f.uid) /
+    SUM(COUNT(DISTINCT f.uid)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
 FROM first_client_touch f
-JOIN user_cohorts uc ON f.user_pseudo_id = uc.user_pseudo_id
+JOIN user_cohorts uc ON f.uid = uc.uid
 WHERE f.rn = 1
 GROUP BY 1, 2
 ORDER BY 2, 3 DESC
@@ -82,7 +82,7 @@ LIMIT 100`,
 WITH
 all_events AS (
   SELECT
-    user_pseudo_id,
+    uid,
     event_timestamp,
     target_domain,
     target_path,
@@ -92,30 +92,30 @@ all_events AS (
 ),
 user_cohorts AS (
   SELECT
-    user_pseudo_id,
+    uid,
     CASE WHEN MAX(is_conversion) = 1 THEN 'Converting' ELSE 'Non-Converting' END AS cohort
   FROM all_events
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 first_client_touch AS (
   SELECT
-    e.user_pseudo_id,
+    e.uid,
     CASE
       {{PAGE_TYPE_CASE}}
       ELSE 'Other'
     END AS page_type,
-    ROW_NUMBER() OVER (PARTITION BY e.user_pseudo_id ORDER BY e.event_timestamp) AS rn
+    ROW_NUMBER() OVER (PARTITION BY e.uid ORDER BY e.event_timestamp) AS rn
   FROM all_events e
   WHERE e.target_domain IN ({{CLIENT_DOMAINS}})
 )
 SELECT
   f.page_type,
   uc.cohort,
-  COUNT(DISTINCT f.user_pseudo_id) AS unique_users,
-  ROUND(100.0 * COUNT(DISTINCT f.user_pseudo_id) /
-    SUM(COUNT(DISTINCT f.user_pseudo_id)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
+  COUNT(DISTINCT f.uid) AS unique_users,
+  ROUND(100.0 * COUNT(DISTINCT f.uid) /
+    SUM(COUNT(DISTINCT f.uid)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
 FROM first_client_touch f
-JOIN user_cohorts uc ON f.user_pseudo_id = uc.user_pseudo_id
+JOIN user_cohorts uc ON f.uid = uc.uid
 WHERE f.rn = 1
 GROUP BY 1, 2
 ORDER BY 2, 3 DESC`,
@@ -130,7 +130,7 @@ ORDER BY 2, 3 DESC`,
 WITH
 all_events AS (
   SELECT
-    user_pseudo_id,
+    uid,
     event_timestamp,
     target_domain,
     target_path,
@@ -140,27 +140,27 @@ all_events AS (
 ),
 user_cohorts AS (
   SELECT
-    user_pseudo_id,
+    uid,
     CASE WHEN MAX(is_conversion) = 1 THEN 'Converting' ELSE 'Non-Converting' END AS cohort
   FROM all_events
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 last_client_touch AS (
   SELECT
-    e.user_pseudo_id,
+    e.uid,
     e.target_path,
-    ROW_NUMBER() OVER (PARTITION BY e.user_pseudo_id ORDER BY e.event_timestamp DESC) AS rn
+    ROW_NUMBER() OVER (PARTITION BY e.uid ORDER BY e.event_timestamp DESC) AS rn
   FROM all_events e
   WHERE e.target_domain IN ({{CLIENT_DOMAINS}})
 )
 SELECT
   l.target_path,
   uc.cohort,
-  COUNT(DISTINCT l.user_pseudo_id) AS unique_users,
-  ROUND(100.0 * COUNT(DISTINCT l.user_pseudo_id) /
-    SUM(COUNT(DISTINCT l.user_pseudo_id)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
+  COUNT(DISTINCT l.uid) AS unique_users,
+  ROUND(100.0 * COUNT(DISTINCT l.uid) /
+    SUM(COUNT(DISTINCT l.uid)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
 FROM last_client_touch l
-JOIN user_cohorts uc ON l.user_pseudo_id = uc.user_pseudo_id
+JOIN user_cohorts uc ON l.uid = uc.uid
 WHERE l.rn = 1
 GROUP BY 1, 2
 ORDER BY 2, 3 DESC
@@ -176,7 +176,7 @@ LIMIT 100`,
 WITH
 all_events AS (
   SELECT
-    user_pseudo_id,
+    uid,
     event_timestamp,
     target_domain,
     target_path,
@@ -186,30 +186,30 @@ all_events AS (
 ),
 user_cohorts AS (
   SELECT
-    user_pseudo_id,
+    uid,
     CASE WHEN MAX(is_conversion) = 1 THEN 'Converting' ELSE 'Non-Converting' END AS cohort
   FROM all_events
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 last_client_touch AS (
   SELECT
-    e.user_pseudo_id,
+    e.uid,
     CASE
       {{PAGE_TYPE_CASE}}
       ELSE 'Other'
     END AS page_type,
-    ROW_NUMBER() OVER (PARTITION BY e.user_pseudo_id ORDER BY e.event_timestamp DESC) AS rn
+    ROW_NUMBER() OVER (PARTITION BY e.uid ORDER BY e.event_timestamp DESC) AS rn
   FROM all_events e
   WHERE e.target_domain IN ({{CLIENT_DOMAINS}})
 )
 SELECT
   l.page_type,
   uc.cohort,
-  COUNT(DISTINCT l.user_pseudo_id) AS unique_users,
-  ROUND(100.0 * COUNT(DISTINCT l.user_pseudo_id) /
-    SUM(COUNT(DISTINCT l.user_pseudo_id)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
+  COUNT(DISTINCT l.uid) AS unique_users,
+  ROUND(100.0 * COUNT(DISTINCT l.uid) /
+    SUM(COUNT(DISTINCT l.uid)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
 FROM last_client_touch l
-JOIN user_cohorts uc ON l.user_pseudo_id = uc.user_pseudo_id
+JOIN user_cohorts uc ON l.uid = uc.uid
 WHERE l.rn = 1
 GROUP BY 1, 2
 ORDER BY 2, 3 DESC`,
@@ -225,7 +225,7 @@ ORDER BY 2, 3 DESC`,
 WITH
 all_events AS (
   SELECT
-    user_pseudo_id,
+    uid,
     event_timestamp,
     target_domain,
     target_path,
@@ -235,14 +235,14 @@ all_events AS (
 ),
 user_cohorts AS (
   SELECT
-    user_pseudo_id,
+    uid,
     CASE WHEN MAX(is_conversion) = 1 THEN 'Converting' ELSE 'Non-Converting' END AS cohort
   FROM all_events
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 client_events_typed AS (
   SELECT
-    e.user_pseudo_id,
+    e.uid,
     e.event_timestamp,
     CASE
       {{PAGE_TYPE_CASE}}
@@ -253,15 +253,15 @@ client_events_typed AS (
 ),
 deduped AS (
   SELECT
-    user_pseudo_id,
+    uid,
     event_timestamp,
     page_type,
-    LAG(page_type) OVER (PARTITION BY user_pseudo_id ORDER BY event_timestamp) AS prev_page_type
+    LAG(page_type) OVER (PARTITION BY uid ORDER BY event_timestamp) AS prev_page_type
   FROM client_events_typed
 ),
 transitions AS (
   SELECT
-    user_pseudo_id,
+    uid,
     prev_page_type AS from_page,
     page_type AS to_page
   FROM deduped
@@ -271,15 +271,15 @@ SELECT
   uc.cohort,
   t.from_page,
   t.to_page,
-  COUNT(DISTINCT t.user_pseudo_id) AS unique_users,
+  COUNT(DISTINCT t.uid) AS unique_users,
   COUNT(*) AS total_transitions,
-  ROUND(100.0 * COUNT(DISTINCT t.user_pseudo_id) /
-    SUM(COUNT(DISTINCT t.user_pseudo_id)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
+  ROUND(100.0 * COUNT(DISTINCT t.uid) /
+    SUM(COUNT(DISTINCT t.uid)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
 FROM transitions t
-JOIN user_cohorts uc ON t.user_pseudo_id = uc.user_pseudo_id
+JOIN user_cohorts uc ON t.uid = uc.uid
 GROUP BY 1, 2, 3
 ORDER BY 1, 4 DESC
-LIMIT 150`,
+QUALIFY ROW_NUMBER() OVER (PARTITION BY uc.cohort ORDER BY COUNT(DISTINCT t.uid) DESC) <= 75`,
       },
     ],
   },
@@ -296,7 +296,7 @@ LIMIT 150`,
 WITH
 all_events AS (
   SELECT
-    user_pseudo_id,
+    uid,
     event_timestamp,
     target_domain,
     CASE WHEN {{CONVERSION_CONDITIONS}} THEN 1 ELSE 0 END AS is_conversion
@@ -305,37 +305,37 @@ all_events AS (
 ),
 user_cohorts AS (
   SELECT
-    user_pseudo_id,
+    uid,
     CASE WHEN MAX(is_conversion) = 1 THEN 'Converting' ELSE 'Non-Converting' END AS cohort
   FROM all_events
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 first_client_ts AS (
   SELECT
-    user_pseudo_id,
+    uid,
     MIN(event_timestamp) AS first_client_time
   FROM all_events
   WHERE target_domain IN ({{CLIENT_DOMAINS}})
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 pre_entry AS (
   SELECT
-    ae.user_pseudo_id,
+    ae.uid,
     ae.target_domain,
-    ROW_NUMBER() OVER (PARTITION BY ae.user_pseudo_id ORDER BY ae.event_timestamp DESC) AS rn
+    ROW_NUMBER() OVER (PARTITION BY ae.uid ORDER BY ae.event_timestamp DESC) AS rn
   FROM all_events ae
-  JOIN first_client_ts fct ON ae.user_pseudo_id = fct.user_pseudo_id
+  JOIN first_client_ts fct ON ae.uid = fct.uid
   WHERE ae.event_timestamp < fct.first_client_time
     AND ae.target_domain NOT IN ({{CLIENT_DOMAINS}})
 )
 SELECT
   p.target_domain,
   uc.cohort,
-  COUNT(DISTINCT p.user_pseudo_id) AS unique_users,
-  ROUND(100.0 * COUNT(DISTINCT p.user_pseudo_id) /
-    SUM(COUNT(DISTINCT p.user_pseudo_id)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
+  COUNT(DISTINCT p.uid) AS unique_users,
+  ROUND(100.0 * COUNT(DISTINCT p.uid) /
+    SUM(COUNT(DISTINCT p.uid)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
 FROM pre_entry p
-JOIN user_cohorts uc ON p.user_pseudo_id = uc.user_pseudo_id
+JOIN user_cohorts uc ON p.uid = uc.uid
 WHERE p.rn = 1
 GROUP BY 1, 2
 ORDER BY 2, 3 DESC
@@ -351,7 +351,7 @@ LIMIT 100`,
 WITH
 all_events AS (
   SELECT
-    user_pseudo_id,
+    uid,
     event_timestamp,
     target_domain,
     CASE WHEN {{CONVERSION_CONDITIONS}} THEN 1 ELSE 0 END AS is_conversion
@@ -360,39 +360,39 @@ all_events AS (
 ),
 user_cohorts AS (
   SELECT
-    user_pseudo_id,
+    uid,
     CASE WHEN MAX(is_conversion) = 1 THEN 'Converting' ELSE 'Non-Converting' END AS cohort
   FROM all_events
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 first_client_ts AS (
-  SELECT user_pseudo_id, MIN(event_timestamp) AS first_client_time
+  SELECT uid, MIN(event_timestamp) AS first_client_time
   FROM all_events WHERE target_domain IN ({{CLIENT_DOMAINS}})
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 pre_entry AS (
   SELECT
-    ae.user_pseudo_id,
+    ae.uid,
     CASE
       ${UNIVERSAL_DOMAIN_CASE}
       {{CLIENT_SPECIFIC_CATEGORIES}}
       WHEN target_domain IN ({{COMPETITOR_DOMAINS}}) THEN 'Competitors'
       ELSE 'Other'
     END AS domain_category,
-    ROW_NUMBER() OVER (PARTITION BY ae.user_pseudo_id ORDER BY ae.event_timestamp DESC) AS rn
+    ROW_NUMBER() OVER (PARTITION BY ae.uid ORDER BY ae.event_timestamp DESC) AS rn
   FROM all_events ae
-  JOIN first_client_ts fct ON ae.user_pseudo_id = fct.user_pseudo_id
+  JOIN first_client_ts fct ON ae.uid = fct.uid
   WHERE ae.event_timestamp < fct.first_client_time
     AND ae.target_domain NOT IN ({{CLIENT_DOMAINS}})
 )
 SELECT
   p.domain_category,
   uc.cohort,
-  COUNT(DISTINCT p.user_pseudo_id) AS unique_users,
-  ROUND(100.0 * COUNT(DISTINCT p.user_pseudo_id) /
-    SUM(COUNT(DISTINCT p.user_pseudo_id)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
+  COUNT(DISTINCT p.uid) AS unique_users,
+  ROUND(100.0 * COUNT(DISTINCT p.uid) /
+    SUM(COUNT(DISTINCT p.uid)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
 FROM pre_entry p
-JOIN user_cohorts uc ON p.user_pseudo_id = uc.user_pseudo_id
+JOIN user_cohorts uc ON p.uid = uc.uid
 WHERE p.rn = 1
 GROUP BY 1, 2
 ORDER BY 2, 3 DESC`,
@@ -407,7 +407,7 @@ ORDER BY 2, 3 DESC`,
 WITH
 all_events AS (
   SELECT
-    user_pseudo_id,
+    uid,
     event_timestamp,
     target_domain,
     CASE WHEN {{CONVERSION_CONDITIONS}} THEN 1 ELSE 0 END AS is_conversion
@@ -416,34 +416,34 @@ all_events AS (
 ),
 user_cohorts AS (
   SELECT
-    user_pseudo_id,
+    uid,
     CASE WHEN MAX(is_conversion) = 1 THEN 'Converting' ELSE 'Non-Converting' END AS cohort
   FROM all_events
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 last_client_ts AS (
-  SELECT user_pseudo_id, MAX(event_timestamp) AS last_client_time
+  SELECT uid, MAX(event_timestamp) AS last_client_time
   FROM all_events WHERE target_domain IN ({{CLIENT_DOMAINS}})
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 post_exit AS (
   SELECT
-    ae.user_pseudo_id,
+    ae.uid,
     ae.target_domain,
-    ROW_NUMBER() OVER (PARTITION BY ae.user_pseudo_id ORDER BY ae.event_timestamp) AS rn
+    ROW_NUMBER() OVER (PARTITION BY ae.uid ORDER BY ae.event_timestamp) AS rn
   FROM all_events ae
-  JOIN last_client_ts lct ON ae.user_pseudo_id = lct.user_pseudo_id
+  JOIN last_client_ts lct ON ae.uid = lct.uid
   WHERE ae.event_timestamp > lct.last_client_time
     AND ae.target_domain NOT IN ({{CLIENT_DOMAINS}})
 )
 SELECT
   p.target_domain,
   uc.cohort,
-  COUNT(DISTINCT p.user_pseudo_id) AS unique_users,
-  ROUND(100.0 * COUNT(DISTINCT p.user_pseudo_id) /
-    SUM(COUNT(DISTINCT p.user_pseudo_id)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
+  COUNT(DISTINCT p.uid) AS unique_users,
+  ROUND(100.0 * COUNT(DISTINCT p.uid) /
+    SUM(COUNT(DISTINCT p.uid)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
 FROM post_exit p
-JOIN user_cohorts uc ON p.user_pseudo_id = uc.user_pseudo_id
+JOIN user_cohorts uc ON p.uid = uc.uid
 WHERE p.rn = 1
 GROUP BY 1, 2
 ORDER BY 2, 3 DESC
@@ -459,7 +459,7 @@ LIMIT 100`,
 WITH
 all_events AS (
   SELECT
-    user_pseudo_id,
+    uid,
     event_timestamp,
     target_domain,
     CASE WHEN {{CONVERSION_CONDITIONS}} THEN 1 ELSE 0 END AS is_conversion
@@ -468,39 +468,39 @@ all_events AS (
 ),
 user_cohorts AS (
   SELECT
-    user_pseudo_id,
+    uid,
     CASE WHEN MAX(is_conversion) = 1 THEN 'Converting' ELSE 'Non-Converting' END AS cohort
   FROM all_events
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 last_client_ts AS (
-  SELECT user_pseudo_id, MAX(event_timestamp) AS last_client_time
+  SELECT uid, MAX(event_timestamp) AS last_client_time
   FROM all_events WHERE target_domain IN ({{CLIENT_DOMAINS}})
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 post_exit AS (
   SELECT
-    ae.user_pseudo_id,
+    ae.uid,
     CASE
       ${UNIVERSAL_DOMAIN_CASE}
       {{CLIENT_SPECIFIC_CATEGORIES}}
       WHEN target_domain IN ({{COMPETITOR_DOMAINS}}) THEN 'Competitors'
       ELSE 'Other'
     END AS domain_category,
-    ROW_NUMBER() OVER (PARTITION BY ae.user_pseudo_id ORDER BY ae.event_timestamp) AS rn
+    ROW_NUMBER() OVER (PARTITION BY ae.uid ORDER BY ae.event_timestamp) AS rn
   FROM all_events ae
-  JOIN last_client_ts lct ON ae.user_pseudo_id = lct.user_pseudo_id
+  JOIN last_client_ts lct ON ae.uid = lct.uid
   WHERE ae.event_timestamp > lct.last_client_time
     AND ae.target_domain NOT IN ({{CLIENT_DOMAINS}})
 )
 SELECT
   p.domain_category,
   uc.cohort,
-  COUNT(DISTINCT p.user_pseudo_id) AS unique_users,
-  ROUND(100.0 * COUNT(DISTINCT p.user_pseudo_id) /
-    SUM(COUNT(DISTINCT p.user_pseudo_id)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
+  COUNT(DISTINCT p.uid) AS unique_users,
+  ROUND(100.0 * COUNT(DISTINCT p.uid) /
+    SUM(COUNT(DISTINCT p.uid)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
 FROM post_exit p
-JOIN user_cohorts uc ON p.user_pseudo_id = uc.user_pseudo_id
+JOIN user_cohorts uc ON p.uid = uc.uid
 WHERE p.rn = 1
 GROUP BY 1, 2
 ORDER BY 2, 3 DESC`,
@@ -515,7 +515,7 @@ ORDER BY 2, 3 DESC`,
 WITH
 all_events AS (
   SELECT
-    user_pseudo_id,
+    uid,
     event_timestamp,
     target_domain,
     CASE WHEN {{CONVERSION_CONDITIONS}} THEN 1 ELSE 0 END AS is_conversion
@@ -524,23 +524,23 @@ all_events AS (
 ),
 user_cohorts AS (
   SELECT
-    user_pseudo_id,
+    uid,
     CASE WHEN MAX(is_conversion) = 1 THEN 'Converting' ELSE 'Non-Converting' END AS cohort
   FROM all_events
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 client_window AS (
   SELECT
-    user_pseudo_id,
+    uid,
     MIN(event_timestamp) AS first_client_time,
     MAX(event_timestamp) AS last_client_time
   FROM all_events WHERE target_domain IN ({{CLIENT_DOMAINS}})
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 mid_journey AS (
-  SELECT ae.user_pseudo_id, ae.target_domain
+  SELECT ae.uid, ae.target_domain
   FROM all_events ae
-  JOIN client_window cw ON ae.user_pseudo_id = cw.user_pseudo_id
+  JOIN client_window cw ON ae.uid = cw.uid
   WHERE ae.event_timestamp > cw.first_client_time
     AND ae.event_timestamp < cw.last_client_time
     AND ae.target_domain NOT IN ({{CLIENT_DOMAINS}})
@@ -548,12 +548,12 @@ mid_journey AS (
 SELECT
   m.target_domain,
   uc.cohort,
-  COUNT(DISTINCT m.user_pseudo_id) AS unique_users,
+  COUNT(DISTINCT m.uid) AS unique_users,
   COUNT(*) AS total_visits,
-  ROUND(100.0 * COUNT(DISTINCT m.user_pseudo_id) /
-    SUM(COUNT(DISTINCT m.user_pseudo_id)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
+  ROUND(100.0 * COUNT(DISTINCT m.uid) /
+    SUM(COUNT(DISTINCT m.uid)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
 FROM mid_journey m
-JOIN user_cohorts uc ON m.user_pseudo_id = uc.user_pseudo_id
+JOIN user_cohorts uc ON m.uid = uc.uid
 GROUP BY 1, 2
 ORDER BY 2, 3 DESC
 LIMIT 100`,
@@ -568,7 +568,7 @@ LIMIT 100`,
 WITH
 all_events AS (
   SELECT
-    user_pseudo_id,
+    uid,
     event_timestamp,
     target_domain,
     CASE WHEN {{CONVERSION_CONDITIONS}} THEN 1 ELSE 0 END AS is_conversion
@@ -577,21 +577,21 @@ all_events AS (
 ),
 user_cohorts AS (
   SELECT
-    user_pseudo_id,
+    uid,
     CASE WHEN MAX(is_conversion) = 1 THEN 'Converting' ELSE 'Non-Converting' END AS cohort
   FROM all_events
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 client_window AS (
-  SELECT user_pseudo_id,
+  SELECT uid,
     MIN(event_timestamp) AS first_client_time,
     MAX(event_timestamp) AS last_client_time
   FROM all_events WHERE target_domain IN ({{CLIENT_DOMAINS}})
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 mid_journey AS (
   SELECT
-    ae.user_pseudo_id,
+    ae.uid,
     CASE
       ${UNIVERSAL_DOMAIN_CASE}
       {{CLIENT_SPECIFIC_CATEGORIES}}
@@ -599,7 +599,7 @@ mid_journey AS (
       ELSE 'Other'
     END AS domain_category
   FROM all_events ae
-  JOIN client_window cw ON ae.user_pseudo_id = cw.user_pseudo_id
+  JOIN client_window cw ON ae.uid = cw.uid
   WHERE ae.event_timestamp > cw.first_client_time
     AND ae.event_timestamp < cw.last_client_time
     AND ae.target_domain NOT IN ({{CLIENT_DOMAINS}})
@@ -607,12 +607,12 @@ mid_journey AS (
 SELECT
   m.domain_category,
   uc.cohort,
-  COUNT(DISTINCT m.user_pseudo_id) AS unique_users,
+  COUNT(DISTINCT m.uid) AS unique_users,
   COUNT(*) AS total_visits,
-  ROUND(100.0 * COUNT(DISTINCT m.user_pseudo_id) /
-    SUM(COUNT(DISTINCT m.user_pseudo_id)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
+  ROUND(100.0 * COUNT(DISTINCT m.uid) /
+    SUM(COUNT(DISTINCT m.uid)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
 FROM mid_journey m
-JOIN user_cohorts uc ON m.user_pseudo_id = uc.user_pseudo_id
+JOIN user_cohorts uc ON m.uid = uc.uid
 GROUP BY 1, 2
 ORDER BY 2, 3 DESC`,
       },
@@ -621,14 +621,15 @@ ORDER BY 2, 3 DESC`,
         label: 'Q7 — Full Cross-Domain Transitions',
         saveAs: 'transitions_full.csv',
         validationOnly: false,
-        note: 'The master query. Upload this file in the Upload Data tab. This drives the Sankey diagram.',
+        note: 'The master query. Upload this file in the Upload Data tab. This drives the Sankey diagram. Pure external → external transitions (no client touchpoint) are excluded.',
         sql: `-- Q7: Full Cross-Domain Transitions — all step-to-step transitions in the full journey
 -- Classifies every event as client page-type or external category
 -- Deduplicates consecutive visits to the same node
+-- Excludes pure external → external transitions (at least one end must be a client page)
 WITH
 all_events AS (
   SELECT
-    user_pseudo_id,
+    uid,
     event_timestamp,
     target_domain,
     target_path,
@@ -638,20 +639,21 @@ all_events AS (
 ),
 user_cohorts AS (
   SELECT
-    user_pseudo_id,
+    uid,
     CASE WHEN MAX(is_conversion) = 1 THEN 'Converting' ELSE 'Non-Converting' END AS cohort
   FROM all_events
-  GROUP BY user_pseudo_id
+  GROUP BY uid
 ),
 events_classified AS (
   SELECT
-    user_pseudo_id,
+    uid,
     event_timestamp,
+    CASE WHEN target_domain IN ({{CLIENT_DOMAINS}}) THEN TRUE ELSE FALSE END AS is_client,
     CASE
       WHEN target_domain IN ({{CLIENT_DOMAINS}}) THEN
         CASE
           {{PAGE_TYPE_CASE}}
-          ELSE 'Client: Other'
+          ELSE '[ME] Other'
         END
       ELSE
         CASE
@@ -665,33 +667,37 @@ events_classified AS (
 ),
 deduped AS (
   SELECT
-    user_pseudo_id,
+    uid,
     event_timestamp,
     node_label,
-    LAG(node_label) OVER (PARTITION BY user_pseudo_id ORDER BY event_timestamp) AS prev_node
+    is_client,
+    LAG(node_label) OVER (PARTITION BY uid ORDER BY event_timestamp) AS prev_node,
+    LAG(is_client) OVER (PARTITION BY uid ORDER BY event_timestamp) AS prev_is_client
   FROM events_classified
 ),
 transitions AS (
   SELECT
-    user_pseudo_id,
+    uid,
     prev_node AS from_node,
     node_label AS to_node
   FROM deduped
-  WHERE prev_node IS NOT NULL AND prev_node != node_label
+  WHERE prev_node IS NOT NULL
+    AND prev_node != node_label
+    AND (is_client OR prev_is_client)  -- at least one end must be a client page
 )
 SELECT
   uc.cohort,
   t.from_node,
   t.to_node,
-  COUNT(DISTINCT t.user_pseudo_id) AS unique_users,
+  COUNT(DISTINCT t.uid) AS unique_users,
   COUNT(*) AS total_transitions,
-  ROUND(100.0 * COUNT(DISTINCT t.user_pseudo_id) /
-    SUM(COUNT(DISTINCT t.user_pseudo_id)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
+  ROUND(100.0 * COUNT(DISTINCT t.uid) /
+    SUM(COUNT(DISTINCT t.uid)) OVER (PARTITION BY uc.cohort), 1) AS pct_of_cohort
 FROM transitions t
-JOIN user_cohorts uc ON t.user_pseudo_id = uc.user_pseudo_id
+JOIN user_cohorts uc ON t.uid = uc.uid
 GROUP BY 1, 2, 3
-ORDER BY 1, 4 DESC
-LIMIT 200`,
+QUALIFY ROW_NUMBER() OVER (PARTITION BY uc.cohort ORDER BY COUNT(DISTINCT t.uid) DESC) <= 100
+ORDER BY 1, unique_users DESC`,
       },
     ],
   },
@@ -801,6 +807,96 @@ export default function SQLTab() {
               </div>
             ))}
           </div>
+        </div>
+      </div>
+
+      {/* Key Concepts & Glossary */}
+      <div className="card" style={{ marginBottom: 16 }}>
+        <h2 className="section-title" style={{ marginBottom: 12 }}>Key Concepts</h2>
+
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '0 28px', marginBottom: 16 }}>
+
+          {/* Journey terms */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', marginBottom: 8 }}>Journey Terms</div>
+            {[
+              ['Conversion', 'A user action signalling commercial intent (e.g. reaching checkout, booking, sign-up). Defined by {{CONVERSION_CONDITIONS}}.'],
+              ['Cohort', 'A group of users with a shared trait. The app always uses two: Converting and Non-Converting.'],
+              ['Entry (first touch)', 'The first page a user visits on the client site in the observation window.'],
+              ['Exit (last touch)', 'The last client page a user visits before the window ends or they leave permanently.'],
+              ['Reach / pct_of_cohort', 'Share of users in a cohort who made a given transition. Controls the Min. Reach slider in the report.'],
+              ['Internal transition', 'Navigation between pages within the client domain — not crossing to external sites.'],
+            ].map(([term, def]) => (
+              <div key={term} style={{ marginBottom: 8, fontSize: 12 }}>
+                <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>{term}</span>
+                <span style={{ color: 'var(--color-text-muted)' }}> — {def}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Sankey layers */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', marginBottom: 8 }}>Sankey Layers</div>
+            {[
+              ['Pre-Client (Layer 0)', 'External domains visited before the user\'s first client site visit.'],
+              ['Discovery (Layer 1)', 'Client pages that are primarily entry points — where users first land.'],
+              ['Evaluation (Layer 2)', 'Client pages visited mid-journey; pages that appear in both entry and exit data.'],
+              ['Conversion (Layer 3)', 'Client pages tagged as ⭐ Conversion in the configurator. Auto-placed in this column.'],
+              ['Post-Client (Layer 4)', 'External domains visited after the user\'s last client site visit.'],
+              ['Mid-journey external', 'External domains visited between first and last client touch (used in Q6, displayed in Layer 0).'],
+            ].map(([term, def]) => (
+              <div key={term} style={{ marginBottom: 8, fontSize: 12 }}>
+                <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>{term}</span>
+                <span style={{ color: 'var(--color-text-muted)' }}> — {def}</span>
+              </div>
+            ))}
+          </div>
+
+          {/* Ribbon types */}
+          <div>
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', marginBottom: 8 }}>Ribbon Types</div>
+            {[
+              ['FOBO — red', 'Fear Of Better Options. A user leaves a Key Page or Conversion page to visit an external site.'],
+              ['Return — green', 'A user comes back to a Key Page or Conversion page after visiting an external site.'],
+              ['Other flow — purple', 'Any transition not involving a Key Page or Conversion page.'],
+            ].map(([term, def]) => (
+              <div key={term} style={{ marginBottom: 8, fontSize: 12 }}>
+                <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>{term}</span>
+                <span style={{ color: 'var(--color-text-muted)' }}> — {def}</span>
+              </div>
+            ))}
+
+            <div style={{ fontSize: 11, fontWeight: 700, textTransform: 'uppercase', letterSpacing: '0.08em', color: 'var(--color-text-muted)', margin: '12px 0 8px' }}>Node Types</div>
+            {[
+              ['Client node', 'A page on the client\'s own website. Drives layer assignment and ribbon colour logic.'],
+              ['Key Page 🔑', 'An important client page that triggers FOBO/Return ribbon colouring when left or returned to.'],
+              ['Conversion ⭐', 'A client page representing a conversion action. Auto-placed in the Conversion layer.'],
+              ['Competitor ⚠', 'An external domain that is a direct competitor. Highlighted in red.'],
+            ].map(([term, def]) => (
+              <div key={term} style={{ marginBottom: 8, fontSize: 12 }}>
+                <span style={{ fontWeight: 600, color: 'var(--color-text)' }}>{term}</span>
+                <span style={{ color: 'var(--color-text-muted)' }}> — {def}</span>
+              </div>
+            ))}
+          </div>
+        </div>
+
+        {/* Categorisation notes */}
+        <div style={{
+          background: '#fffbf0',
+          border: '1px solid #f0e6c0',
+          borderRadius: 8,
+          padding: '12px 16px',
+          fontSize: 12,
+          lineHeight: 1.7,
+        }}>
+          <div style={{ fontWeight: 700, marginBottom: 6, color: '#7a5c00' }}>⚠ Categorisation reminders</div>
+          <ul style={{ margin: 0, paddingLeft: 18, color: 'var(--color-text-muted)' }}>
+            <li><strong>Always end your <code>{'{{PAGE_TYPE_CASE}}'}</code> block with <code>ELSE '[ME] Other'</code></strong> — this keeps the client catch-all label consistent across Q1b, Q2b, Q3 and Q7. The app template's <code>ELSE 'Other'</code> becomes unreachable.</li>
+            <li><strong>Search</strong> covers the major global engines (Google, Bing, DuckDuckGo, etc.). Add regional variants relevant to your market in <code>{'{{CLIENT_SPECIFIC_CATEGORIES}}'}</code> — e.g. Yandex for Russia, Naver for Korea, Baidu for China.</li>
+            <li><strong>Other (external)</strong> is a catch-all for uncategorised domains. Run Q4a and Q5a first, review the raw domain list, and promote any significant domains into named categories before running Q4b/Q5b.</li>
+            <li><strong>External → external transitions</strong> are excluded from Q7 by design — only transitions where at least one end is a client page are included in the Sankey.</li>
+          </ul>
         </div>
       </div>
 
